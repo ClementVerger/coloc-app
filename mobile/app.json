@@ -14,6 +14,11 @@
     },
     "android": {
       "package": "com.colocapp.mobile"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "5f1aed1b-d157-4621-bf62-6dbcc408cc0a"
+      }
     }
   }
 }
