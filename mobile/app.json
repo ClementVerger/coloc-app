@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Coloc'",
+    "slug": "coloc-app",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#FBF4E6"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.colocapp.mobile"
+    },
+    "android": {
+      "package": "com.colocapp.mobile"
+    }
+  }
+}

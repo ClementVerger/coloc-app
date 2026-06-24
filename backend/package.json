@@ -1,0 +1,25 @@
+{
+  "name": "coloc-backend",
+  "version": "0.1.0",
+  "description": "API Coloc' - gestion des comptes de colocation",
+  "main": "src/server.js",
+  "scripts": {
+    "build": "echo 'No build step required'",
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "migrate": "node src/db/migrate.js"
+  },
+  "dependencies": {
+    "@clerk/express": "^2.1.31",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "expo-server-sdk": "^6.1.0",
+    "express": "^4.19.2",
+    "express-validator": "^7.1.0",
+    "helmet": "^7.1.0",
+    "pg": "^8.12.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}
