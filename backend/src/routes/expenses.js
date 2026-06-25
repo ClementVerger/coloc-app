@@ -54,18 +54,44 @@ function pagesWordsToText(pages) {
   return lines.join('\n');
 }
 
-// Extrait le montant total d'un texte OCR reconstruit (gère , et . comme séparateur décimal)
+// Extrait le montant total d'un texte OCR reconstruit
 function extractAmountFromOcrText(text) {
   const lines = text.split('\n');
-  const totalRe = /total\s*(?:ttc|à\s*payer|net)?[^\d]*(\d[\d\s]*[.,]\d{2})/i;
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const m = lines[i].match(totalRe);
-    if (m) {
-      const val = parseFloat(m[1].replace(/\s/g, '').replace(',', '.'));
+
+  const toFloat = (s) => parseFloat(s.replace(/\s/g, '').replace(',', '.'));
+
+  // Retourne le dernier montant trouvé dans une chaîne (ex. "91,00" ou "91.00")
+  const findAmount = (str) => {
+    const matches = [...str.matchAll(/(\d{1,5}[,.]?\s*\d{0,2}[,.]\d{2})/g)];
+    for (let i = matches.length - 1; i >= 0; i--) {
+      const val = toFloat(matches[i][1]);
       if (isFinite(val) && val > 0) return val;
     }
+    return null;
+  };
+
+  // Stratégie 1 : ligne contenant "Total" → montant sur la même ligne ou la suivante
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (/\btotal\b/i.test(lines[i])) {
+      const val = findAmount(lines[i]) ?? (i + 1 < lines.length ? findAmount(lines[i + 1]) : null);
+      if (val) return val;
+    }
   }
-  return null;
+
+  // Stratégie 2 : ligne commençant par un montant suivi d'un mot-clé comptable
+  for (const line of lines) {
+    if (/chif|d'aff|aff\.|net\b/i.test(line)) {
+      const val = findAmount(line);
+      if (val) return val;
+    }
+  }
+
+  // Stratégie 3 : plus grand montant dans la moitié basse du ticket
+  const halfStart = Math.floor(lines.length / 2);
+  const amounts = lines.slice(halfStart).flatMap((line) =>
+    [...line.matchAll(/(\d{1,5}[,.]\d{2})/g)].map((m) => toFloat(m[1])).filter((v) => isFinite(v) && v > 0)
+  );
+  return amounts.length ? Math.max(...amounts) : null;
 }
 
 // POST /expenses/scan-receipt — OCR ticket de caisse via Mindee
