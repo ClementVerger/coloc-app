@@ -25,17 +25,43 @@ const upload = multer({
 // ID du modèle OCR Mindee v2 (disponible sur app.mindee.com > votre modèle OCR)
 const MINDEE_OCR_MODEL_ID = process.env.MINDEE_OCR_MODEL_ID || '9fda0748-bfac-4637-ae65-dea08ea10a18';
 
-// Extrait le montant total d'un texte OCR brut (gère , et . comme séparateur décimal)
+// Reconstruit le texte lisible depuis les mots OCR Mindee v2 (groupés par ligne via position Y)
+function pagesWordsToText(pages) {
+  const words = [];
+  for (const page of pages) {
+    for (const w of (page.words ?? [])) {
+      const y = Math.min(...w.polygon.map((pt) => pt[1]));
+      const x = Math.min(...w.polygon.map((pt) => pt[0]));
+      words.push({ content: w.content, x, y });
+    }
+  }
+  words.sort((a, b) => a.y - b.y || a.x - b.x);
+
+  const lines = [];
+  let lineWords = [];
+  let lineY = -1;
+  for (const w of words) {
+    if (lineY < 0 || Math.abs(w.y - lineY) < 0.015) {
+      lineWords.push(w);
+      if (lineY < 0) lineY = w.y;
+    } else {
+      lines.push(lineWords.map((lw) => lw.content).join(' '));
+      lineWords = [w];
+      lineY = w.y;
+    }
+  }
+  if (lineWords.length) lines.push(lineWords.map((lw) => lw.content).join(' '));
+  return lines.join('\n');
+}
+
+// Extrait le montant total d'un texte OCR reconstruit (gère , et . comme séparateur décimal)
 function extractAmountFromOcrText(text) {
   const lines = text.split('\n');
-  // Cherche la dernière ligne contenant un mot-clé "total" suivi d'un nombre
   const totalRe = /total\s*(?:ttc|à\s*payer|net)?[^\d]*(\d[\d\s]*[.,]\d{2})/i;
-  // Parcourt les lignes en ordre inverse pour prendre le total le plus bas (grand total)
   for (let i = lines.length - 1; i >= 0; i--) {
     const m = lines[i].match(totalRe);
     if (m) {
-      const normalized = m[1].replace(/\s/g, '').replace(',', '.');
-      const val = parseFloat(normalized);
+      const val = parseFloat(m[1].replace(/\s/g, '').replace(',', '.'));
       if (isFinite(val) && val > 0) return val;
     }
   }
@@ -77,12 +103,9 @@ router.post(
         { modelId: MINDEE_OCR_MODEL_ID }
       );
 
-      // Log complet pour diagnostiquer la structure de la réponse
-      console.log('[OCR Mindee] response keys:', Object.keys(response ?? {}));
-      console.log('[OCR Mindee] inference:', JSON.stringify(response?.inference).slice(0, 500));
       const pages = response?.inference?.result?.pages ?? [];
-      const fullText = pages.map((p) => p?.text ?? '').join('\n');
-      console.log('[OCR Mindee] texte extrait (200 car.):', fullText.slice(0, 200));
+      const fullText = pagesWordsToText(pages);
+      console.log('[OCR Mindee] texte reconstruit (300 car.):', fullText.slice(0, 300));
 
       const amount = extractAmountFromOcrText(fullText);
 
