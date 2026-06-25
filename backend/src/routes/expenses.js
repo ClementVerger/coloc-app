@@ -29,7 +29,9 @@ const GEMINI_MODEL = 'gemini-1.5-flash';
 router.post(
   '/scan-receipt',
   (req, res, next) => {
+    console.log('[scan-receipt] handler atteint, Content-Type:', req.headers['content-type']);
     upload.single('receipt')(req, res, (err) => {
+      console.log('[scan-receipt] multer cb — err:', err?.message ?? null, '| file:', req.file?.originalname ?? null);
       if (!err) return next();
       if (err.code === 'LIMIT_FILE_SIZE')
         return res.status(400).json({ error: "L'image est trop grande (max 10 Mo)." });
