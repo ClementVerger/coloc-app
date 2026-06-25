@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, FlatList, StyleSheet,
-  ActivityIndicator, TouchableOpacity, Alert,
+  ActivityIndicator, TouchableOpacity, Alert, AppState,
 } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -14,6 +14,7 @@ export default function HistoryScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const appState = useRef(AppState.currentState);
 
   // I6 — Chargement avec état d'erreur visible et bouton "Réessayer"
   const loadExpenses = useCallback(async () => {
@@ -34,6 +35,25 @@ export default function HistoryScreen({ navigation }) {
   useEffect(() => {
     loadExpenses();
   }, [loadExpenses]);
+
+  // Polling toutes les 30s + refresh immédiat quand l'app revient au premier plan
+  useEffect(() => {
+    if (!currentGroup) return;
+
+    const interval = setInterval(loadExpenses, 30_000);
+
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (appState.current.match(/inactive|background/) && nextState === 'active') {
+        loadExpenses();
+      }
+      appState.current = nextState;
+    });
+
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, [currentGroup, loadExpenses]);
 
   const handleExport = async () => {
     setExporting(true);

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, Button, FlatList,
-  ActivityIndicator, TouchableOpacity, Platform,
+  ActivityIndicator, TouchableOpacity, Platform, AppState,
 } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
 import * as Notifications from 'expo-notifications';
@@ -34,6 +34,7 @@ export default function HomeScreen({ navigation }) {
   const [loadError, setLoadError] = useState(false);
 
   const pushRegistered = useRef(false);
+  const appState = useRef(AppState.currentState);
 
   // Boutons "Paramètres" et "Inviter" dans le header
   useEffect(() => {
@@ -88,6 +89,25 @@ export default function HomeScreen({ navigation }) {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Polling toutes les 30s + refresh immédiat quand l'app revient au premier plan
+  useEffect(() => {
+    if (!currentGroup) return;
+
+    const interval = setInterval(loadData, 30_000);
+
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (appState.current.match(/inactive|background/) && nextState === 'active') {
+        loadData();
+      }
+      appState.current = nextState;
+    });
+
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, [currentGroup, loadData]);
 
   if (loading) return <ActivityIndicator style={styles.center} />;
 

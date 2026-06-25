@@ -38,6 +38,10 @@ export const leaveGroup = (groupId) => api.post(`/groups/${groupId}/leave`);
 // --- Dépenses ---
 export const getExpenses = (groupId) => api.get(`/expenses/group/${groupId}`);
 export const addExpense = (payload) => api.post('/expenses', payload);
+export const scanReceipt = (formData) =>
+  api.post('/expenses/scan-receipt', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
 // responseType 'text' pour recevoir le CSV brut sans tentative de parsing JSON
 export const exportExpenses = (groupId) =>
   api.get(`/expenses/group/${groupId}/export`, { responseType: 'text' });

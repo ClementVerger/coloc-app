@@ -9,7 +9,8 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { addExpense, getGroupMembers } from '../services/api';
+import * as ImagePicker from 'expo-image-picker';
+import { addExpense, getGroupMembers, scanReceipt } from '../services/api';
 import { useApp } from '../context/AppContext';
 
 const CATEGORIES = [
@@ -43,6 +44,9 @@ export default function AddExpenseScreen({ navigation }) {
   const [shares, setShares] = useState({});
 
   const [submitting, setSubmitting] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  // 'success' | 'failure' | null
+  const [scanHint, setScanHint] = useState(null);
 
   useEffect(() => {
     if (!currentGroup) return;
@@ -59,6 +63,61 @@ export default function AddExpenseScreen({ navigation }) {
 
   const total = Object.values(shares).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
   const totalOk = Math.abs(total - 100) < 0.01;
+
+  const handleScanReceipt = () => {
+    Alert.alert('Scanner un ticket', "Source de l'image", [
+      { text: 'Prendre une photo', onPress: () => pickAndScan('camera') },
+      { text: 'Choisir depuis la galerie', onPress: () => pickAndScan('library') },
+      { text: 'Annuler', style: 'cancel' },
+    ]);
+  };
+
+  const pickAndScan = async (source) => {
+    try {
+      let result;
+      if (source === 'camera') {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission refusée', "L'accès à la caméra est nécessaire pour scanner un ticket.");
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.8 });
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission refusée', "L'accès à la galerie est nécessaire pour importer une image.");
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+      }
+
+      if (result.canceled) return;
+
+      const asset = result.assets[0];
+      setScanning(true);
+      setScanHint(null);
+
+      const formData = new FormData();
+      formData.append('receipt', { uri: asset.uri, type: asset.mimeType || 'image/jpeg', name: 'receipt.jpg' });
+
+      try {
+        const res = await scanReceipt(formData);
+        const { amount } = res.data;
+        if (amount !== null && amount > 0) {
+          setAmount(amount.toFixed(2));
+          setScanHint('success');
+        } else {
+          setScanHint('failure');
+        }
+      } catch {
+        setScanHint('failure');
+      } finally {
+        setScanning(false);
+      }
+    } catch {
+      Alert.alert('Erreur', "Impossible d'accéder à l'appareil photo ou à la galerie.");
+    }
+  };
 
   const handleSubmit = async () => {
     const parsed = parseFloat(amount);
@@ -103,6 +162,22 @@ export default function AddExpenseScreen({ navigation }) {
 
   return (
     <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+      {/* ── Scanner un ticket ── */}
+      <TouchableOpacity
+        style={[styles.scanBtn, scanning && styles.scanBtnDisabled]}
+        onPress={handleScanReceipt}
+        disabled={scanning}
+      >
+        {scanning ? (
+          <>
+            <ActivityIndicator color={ACTIVE_COLOR} style={{ marginRight: 8 }} />
+            <Text style={styles.scanBtnText}>Analyse du ticket...</Text>
+          </>
+        ) : (
+          <Text style={styles.scanBtnText}>Scanner un ticket</Text>
+        )}
+      </TouchableOpacity>
+
       {/* ── Montant ── */}
       <Text style={styles.label}>Montant (€)</Text>
       <TextInput
@@ -112,6 +187,14 @@ export default function AddExpenseScreen({ navigation }) {
         onChangeText={setAmount}
         placeholder="0.00"
       />
+      {scanHint === 'success' && (
+        <Text style={styles.scanHintSuccess}>Montant détecté, vérifie qu'il est correct.</Text>
+      )}
+      {scanHint === 'failure' && (
+        <Text style={styles.scanHintFailure}>
+          Impossible de lire le montant automatiquement, saisis-le manuellement.
+        </Text>
+      )}
 
       {/* ── Catégorie ── */}
       <Text style={styles.label}>Catégorie</Text>
@@ -209,6 +292,23 @@ const ACTIVE_COLOR = '#2D6A4F';
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#fff' },
+
+  scanBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: ACTIVE_COLOR,
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 8,
+    backgroundColor: '#f0f7f4',
+  },
+  scanBtnDisabled: { opacity: 0.6 },
+  scanBtnText: { color: ACTIVE_COLOR, fontSize: 15, fontWeight: '600' },
+  scanHintSuccess: { fontSize: 12, color: ACTIVE_COLOR, marginTop: 6 },
+  scanHintFailure: { fontSize: 12, color: '#e53935', marginTop: 6 },
+
   label: { fontSize: 13, fontWeight: '600', color: '#444', marginTop: 18, marginBottom: 6 },
   input: {
     borderWidth: 1,

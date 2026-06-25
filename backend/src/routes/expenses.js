@@ -1,4 +1,6 @@
 const express = require('express');
+const multer = require('multer');
+const mindee = require('mindee');
 const pool = require('../config/db');
 const { notifyNewExpense } = require('../utils/notifications');
 const { assertMembership } = require('../middleware/membership');
@@ -7,6 +9,83 @@ const router = express.Router();
 
 const VALID_CATEGORIES = ['electricite', 'courses', 'internet', 'autre'];
 const VALID_SPLIT_TYPES = ['equal', 'prorata'];
+
+// ── OCR : upload en mémoire, max 10 Mo, images uniquement ──
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+      return cb(Object.assign(new Error("Le fichier doit être une image."), { status: 400 }));
+    }
+    cb(null, true);
+  },
+});
+
+const OCR_CONFIDENCE_THRESHOLD = 0.3;
+
+// POST /expenses/scan-receipt — OCR ticket de caisse via Mindee
+// requireAuth appliqué en amont (server.js) — pas d'assertMembership car aucune donnée de groupe n'est touchée
+router.post(
+  '/scan-receipt',
+  (req, res, next) => {
+    upload.single('receipt')(req, res, (err) => {
+      if (!err) return next();
+      if (err.code === 'LIMIT_FILE_SIZE')
+        return res.status(400).json({ error: "L'image est trop grande (max 10 Mo)." });
+      return res.status(err.status ?? 400).json({ error: err.message ?? "Impossible de lire l'image envoyée." });
+    });
+  },
+  async (req, res, next) => {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Aucune image reçue. Envoie le champ "receipt" en multipart/form-data.' });
+    }
+    if (!process.env.MINDEE_API_KEY) {
+      return res.status(503).json({ error: 'Service OCR non configuré.' });
+    }
+
+    try {
+      const client = new mindee.Client({ apiKey: process.env.MINDEE_API_KEY });
+      const inputSource = client.docFromBuffer(req.file.buffer, req.file.originalname || 'receipt.jpg');
+      const apiResponse = await client.parse(mindee.product.ReceiptV5, inputSource);
+      const prediction = apiResponse.document.inference.prediction;
+
+      const totalAmount = prediction.totalAmount;
+      const totalNet = prediction.totalNet;
+      const confidence = totalAmount?.confidence ?? null;
+
+      console.log('[OCR] totalAmount:', totalAmount?.value, '| confidence:', confidence);
+      console.log('[OCR] totalNet:', totalNet?.value, '| confidence:', totalNet?.confidence);
+      console.log('[OCR] supplier:', prediction.supplierName?.value, '| date:', prediction.date?.value);
+
+      // Priorité à totalAmount ; fallback sur totalNet si totalAmount absent/peu fiable
+      let finalValue = null;
+      let finalConfidence = null;
+      if (totalAmount?.value != null) {
+        finalValue = Number(totalAmount.value);
+        finalConfidence = totalAmount.confidence ?? null;
+      } else if (totalNet?.value != null) {
+        finalValue = Number(totalNet.value);
+        finalConfidence = totalNet.confidence ?? null;
+      }
+
+      const amount = finalConfidence >= OCR_CONFIDENCE_THRESHOLD && finalValue != null ? finalValue : null;
+
+      return res.json({
+        amount,
+        merchantName: prediction.supplierName?.value ?? null,
+        date: prediction.date?.value ?? null,
+        confidence: finalConfidence,
+      });
+    } catch (err) {
+      if (err?.status === 429)
+        return res.status(429).json({ error: 'Quota OCR dépassé. Réessaie plus tard.' });
+      if (err?.code === 'ECONNABORTED' || err?.code === 'ETIMEDOUT')
+        return res.status(503).json({ error: 'Le service OCR est temporairement indisponible.' });
+      next(err);
+    }
+  }
+);
 
 // Ajouter une dépense (paidBy = utilisateur authentifié)
 // C2 — assertMembership vérifie l'appartenance via req.body.groupId
