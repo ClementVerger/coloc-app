@@ -52,4 +52,16 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Une erreur est survenue.' });
 });
 
-app.listen(PORT, '0.0.0.0', () => console.log(`API Coloc' démarrée sur le port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`API Coloc' démarrée sur le port ${PORT}`);
+  const routes = [];
+  app._router.stack.forEach((layer) => {
+    if (layer.handle?.stack) {
+      const prefix = layer.regexp.source.replace('\\/?(?=\\/|$)', '').replace('^\\/', '/').replace(/\\\//g, '/');
+      layer.handle.stack.forEach((r) => {
+        if (r.route) routes.push(`${Object.keys(r.route.methods).join(',').toUpperCase()} ${prefix}${r.route.path}`);
+      });
+    }
+  });
+  console.log('[Routes enregistrées]', routes);
+});
