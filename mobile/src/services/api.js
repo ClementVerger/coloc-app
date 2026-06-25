@@ -52,5 +52,7 @@ export const getBalances = (groupId) => api.get(`/balances/group/${groupId}`);
 // --- Dépôt de garantie ---
 export const getDeposit = (groupId) => api.get(`/deposit/group/${groupId}`);
 export const addDeposit = (payload) => api.post('/deposit', payload);
+export const transferDeposit = (payload) => api.post('/deposit/transfer', payload);
+export const settleDeposit = (payload) => api.post('/deposit/settle', payload);
 
 export default api;
