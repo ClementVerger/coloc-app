@@ -45,9 +45,9 @@ router.post(
     }
 
     try {
-      const client = new mindee.Client({ apiKey: process.env.MINDEE_API_KEY });
-      const inputSource = client.docFromBuffer(req.file.buffer, req.file.originalname || 'receipt.jpg');
-      const apiResponse = await client.parse(mindee.product.ReceiptV5, inputSource);
+      const client = new mindee.v1.Client({ apiKey: process.env.MINDEE_API_KEY });
+      const inputSource = new mindee.BufferInput({ buffer: req.file.buffer, filename: req.file.originalname || 'receipt.jpg' });
+      const apiResponse = await client.parse(mindee.v1.product.ReceiptV5, inputSource);
       const prediction = apiResponse.document.inference.prediction;
 
       const totalAmount = prediction.totalAmount;
