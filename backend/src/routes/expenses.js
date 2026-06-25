@@ -1,6 +1,6 @@
 const express = require('express');
 const multer = require('multer');
-const mindee = require('mindee');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const pool = require('../config/db');
 const { notifyNewExpense } = require('../utils/notifications');
 const { assertMembership } = require('../middleware/membership');
@@ -22,7 +22,7 @@ const upload = multer({
   },
 });
 
-const OCR_CONFIDENCE_THRESHOLD = 0.3;
+const GEMINI_MODEL = 'gemini-1.5-flash';
 
 // POST /expenses/scan-receipt — OCR ticket de caisse via Mindee
 // requireAuth appliqué en amont (server.js) — pas d'assertMembership car aucune donnée de groupe n'est touchée
@@ -40,45 +40,46 @@ router.post(
     if (!req.file) {
       return res.status(400).json({ error: 'Aucune image reçue. Envoie le champ "receipt" en multipart/form-data.' });
     }
-    if (!process.env.MINDEE_API_KEY) {
+    if (!process.env.GEMINI_API_KEY) {
       return res.status(503).json({ error: 'Service OCR non configuré.' });
     }
 
     try {
-      const client = new mindee.v1.Client({ apiKey: process.env.MINDEE_API_KEY });
-      const inputSource = new mindee.BufferInput({ buffer: req.file.buffer, filename: req.file.originalname || 'receipt.jpg' });
-      const apiResponse = await client.parse(mindee.v1.product.ReceiptV5, inputSource);
-      const prediction = apiResponse.document.inference.prediction;
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
-      const totalAmount = prediction.totalAmount;
-      const totalNet = prediction.totalNet;
-      const confidence = totalAmount?.confidence ?? null;
+      const result = await model.generateContent([
+        { inlineData: { data: req.file.buffer.toString('base64'), mimeType: req.file.mimetype || 'image/jpeg' } },
+        `Analyse ce ticket de caisse et extrais uniquement :
+- Le montant total final (total TTC, total à payer, grand total — pas un sous-total)
+- Le nom du commerce ou restaurant
+- La date au format YYYY-MM-DD
 
-      console.log('[OCR] totalAmount:', totalAmount?.value, '| confidence:', confidence);
-      console.log('[OCR] totalNet:', totalNet?.value, '| confidence:', totalNet?.confidence);
-      console.log('[OCR] supplier:', prediction.supplierName?.value, '| date:', prediction.date?.value);
+Réponds UNIQUEMENT avec du JSON valide, sans markdown, sans texte autour :
+{"amount": <nombre décimal ou null>, "merchantName": "<string ou null>", "date": "<YYYY-MM-DD ou null>"}`,
+      ]);
 
-      // Priorité à totalAmount ; fallback sur totalNet si totalAmount absent/peu fiable
-      let finalValue = null;
-      let finalConfidence = null;
-      if (totalAmount?.value != null) {
-        finalValue = Number(totalAmount.value);
-        finalConfidence = totalAmount.confidence ?? null;
-      } else if (totalNet?.value != null) {
-        finalValue = Number(totalNet.value);
-        finalConfidence = totalNet.confidence ?? null;
+      const raw = result.response.text().trim().replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
+      console.log('[OCR Gemini] réponse brute:', raw);
+
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        console.warn('[OCR Gemini] JSON invalide:', raw);
+        return res.json({ amount: null, merchantName: null, date: null, confidence: null });
       }
 
-      const amount = finalConfidence >= OCR_CONFIDENCE_THRESHOLD && finalValue != null ? finalValue : null;
+      const amount = typeof parsed.amount === 'number' && parsed.amount > 0 ? parsed.amount : null;
 
       return res.json({
         amount,
-        merchantName: prediction.supplierName?.value ?? null,
-        date: prediction.date?.value ?? null,
-        confidence: finalConfidence,
+        merchantName: parsed.merchantName ?? null,
+        date: parsed.date ?? null,
+        confidence: amount !== null ? 1.0 : null,
       });
     } catch (err) {
-      if (err?.status === 429)
+      if (err?.status === 429 || err?.code === 429)
         return res.status(429).json({ error: 'Quota OCR dépassé. Réessaie plus tard.' });
       if (err?.code === 'ECONNABORTED' || err?.code === 'ETIMEDOUT')
         return res.status(503).json({ error: 'Le service OCR est temporairement indisponible.' });
