@@ -77,7 +77,9 @@ router.post(
         { modelId: MINDEE_OCR_MODEL_ID }
       );
 
-      // Concatène le texte brut de toutes les pages
+      // Log complet pour diagnostiquer la structure de la réponse
+      console.log('[OCR Mindee] response keys:', Object.keys(response ?? {}));
+      console.log('[OCR Mindee] inference:', JSON.stringify(response?.inference).slice(0, 500));
       const pages = response?.inference?.result?.pages ?? [];
       const fullText = pages.map((p) => p?.text ?? '').join('\n');
       console.log('[OCR Mindee] texte extrait (200 car.):', fullText.slice(0, 200));
