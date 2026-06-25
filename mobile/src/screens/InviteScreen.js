@@ -1,5 +1,9 @@
-import { View, Text, TouchableOpacity, StyleSheet, Share, Alert } from 'react-native';
+import { View, Text, StyleSheet, Share, Alert } from 'react-native';
 import { useApp } from '../context/AppContext';
+import Button from '../components/Button';
+import { theme } from '../theme/theme';
+
+const { colors, spacing, radius } = theme;
 
 export default function InviteScreen() {
   const { currentGroup } = useApp();
@@ -11,7 +15,7 @@ export default function InviteScreen() {
         message: `Rejoins ma coloc "${currentGroup.name}" sur l'app Coloc' !\nCode d'invitation : ${code}`,
       });
     } catch (err) {
-      Alert.alert('Erreur', 'Impossible d\'ouvrir le partage.');
+      Alert.alert('Erreur', "Impossible d'ouvrir le partage.");
     }
   };
 
@@ -39,41 +43,55 @@ export default function InviteScreen() {
 
       <Text style={styles.hint}>Appui long sur le code pour le copier</Text>
 
-      <TouchableOpacity style={styles.button} onPress={handleShare}>
-        <Text style={styles.buttonText}>Partager l'invitation</Text>
-      </TouchableOpacity>
+      <Button onPress={handleShare} style={styles.shareBtn}>
+        Partager l'invitation
+      </Button>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, backgroundColor: '#FBF4E6', alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 24, fontWeight: '700', marginBottom: 12, textAlign: 'center' },
-  subtitle: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 32, lineHeight: 20 },
+  container: {
+    flex: 1,
+    padding: spacing.lg,
+    backgroundColor: colors.cream,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.ink,
+    marginBottom: spacing.md,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: colors.inkMuted,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+    lineHeight: 20,
+  },
   codeBox: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: colors.white,
+    borderRadius: radius.xl,
     paddingVertical: 28,
     paddingHorizontal: 40,
     borderWidth: 2,
-    borderColor: '#2D6A4F',
-    marginBottom: 10,
+    borderColor: colors.terracotta,
+    marginBottom: spacing.sm,
   },
   code: {
     fontSize: 40,
     fontWeight: '800',
     letterSpacing: 10,
-    color: '#2D6A4F',
+    color: colors.terracotta,
     textAlign: 'center',
   },
-  hint: { fontSize: 12, color: '#aaa', marginBottom: 32 },
-  button: {
-    backgroundColor: '#2D6A4F',
-    borderRadius: 10,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    alignItems: 'center',
-    width: '100%',
+  hint: {
+    fontSize: 12,
+    color: colors.inkLight,
+    marginBottom: spacing.xl,
   },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  shareBtn: { width: '100%' },
 });

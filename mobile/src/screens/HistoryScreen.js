@@ -7,6 +7,11 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { getExpenses, exportExpenses } from '../services/api';
 import { useApp } from '../context/AppContext';
+import Button from '../components/Button';
+import ScreenContainer from '../components/ScreenContainer';
+import { theme } from '../theme/theme';
+
+const { colors, spacing, radius } = theme;
 
 export default function HistoryScreen({ navigation }) {
   const { currentGroup } = useApp();
@@ -16,7 +21,6 @@ export default function HistoryScreen({ navigation }) {
   const [exporting, setExporting] = useState(false);
   const appState = useRef(AppState.currentState);
 
-  // I6 — Chargement avec état d'erreur visible et bouton "Réessayer"
   const loadExpenses = useCallback(async () => {
     if (!currentGroup) { setLoading(false); return; }
     setLoading(true);
@@ -36,19 +40,15 @@ export default function HistoryScreen({ navigation }) {
     loadExpenses();
   }, [loadExpenses]);
 
-  // Polling toutes les 30s + refresh immédiat quand l'app revient au premier plan
   useEffect(() => {
     if (!currentGroup) return;
-
     const interval = setInterval(loadExpenses, 30_000);
-
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (appState.current.match(/inactive|background/) && nextState === 'active') {
         loadExpenses();
       }
       appState.current = nextState;
     });
-
     return () => {
       clearInterval(interval);
       subscription.remove();
@@ -76,32 +76,37 @@ export default function HistoryScreen({ navigation }) {
       } else {
         Alert.alert(
           'Partage indisponible',
-          'Le partage de fichiers n\'est pas disponible sur cet appareil.'
+          "Le partage de fichiers n'est pas disponible sur cet appareil."
         );
       }
     } catch (err) {
-      Alert.alert('Erreur', err?.response?.data?.error || 'Impossible d\'exporter les dépenses.');
+      Alert.alert('Erreur', err?.response?.data?.error || "Impossible d'exporter les dépenses.");
     } finally {
       setExporting(false);
     }
   };
 
-  if (loading) return <ActivityIndicator style={styles.center} />;
+  if (loading) {
+    return (
+      <ScreenContainer centered>
+        <ActivityIndicator color={colors.terracotta} />
+      </ScreenContainer>
+    );
+  }
 
   if (!currentGroup) {
-    return <View style={styles.container}><Text>Aucune coloc sélectionnée.</Text></View>;
+    return <ScreenContainer><Text style={styles.emptyText}>Aucune coloc sélectionnée.</Text></ScreenContainer>;
   }
 
   return (
-    <View style={styles.container}>
+    <ScreenContainer>
       {/* Lien vers la gestion de la caution */}
       <TouchableOpacity style={styles.linkCard} onPress={() => navigation.navigate('Deposit')}>
-        <Text style={styles.linkCardText}>Dépôt de garantie →</Text>
+        <Text style={styles.linkCardText}>Dépôt de garantie  →</Text>
       </TouchableOpacity>
 
       <Text style={styles.sectionTitle}>Historique des dépenses</Text>
 
-      {/* I6 — Bandeau d'erreur avec bouton Réessayer */}
       {loadError ? (
         <View style={styles.errorBanner}>
           <Text style={styles.errorBannerText}>
@@ -129,78 +134,69 @@ export default function HistoryScreen({ navigation }) {
               <Text style={styles.rowAmount}>{Number(item.amount).toFixed(2)} €</Text>
             </View>
           )}
-          ListEmptyComponent={<Text style={styles.empty}>Aucune dépense enregistrée.</Text>}
+          ListEmptyComponent={<Text style={styles.emptyText}>Aucune dépense enregistrée.</Text>}
           ListFooterComponent={
             expenses.length > 0 ? (
-              <TouchableOpacity
-                style={[styles.exportBtn, exporting && styles.exportBtnDisabled]}
+              <Button
+                variant="secondary"
                 onPress={handleExport}
-                disabled={exporting}
+                loading={exporting}
+                style={styles.exportBtn}
               >
-                {exporting ? (
-                  <ActivityIndicator color="#2D6A4F" />
-                ) : (
-                  <Text style={styles.exportBtnText}>Exporter en CSV</Text>
-                )}
-              </TouchableOpacity>
+                Exporter en CSV
+              </Button>
             ) : null
           }
         />
       )}
-    </View>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
-  center: { flex: 1, justifyContent: 'center' },
-  linkCard: {
-    backgroundColor: '#EDF7F2',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 8,
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.ink,
+    marginTop: spacing.base,
+    marginBottom: spacing.sm,
   },
-  linkCardText: { color: '#2D6A4F', fontWeight: '600', fontSize: 14 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', marginTop: 16, marginBottom: 8 },
+  linkCard: {
+    backgroundColor: colors.slateLight,
+    borderRadius: radius.md,
+    padding: 14,
+    marginBottom: spacing.xs,
+  },
+  linkCardText: { color: colors.slate, fontWeight: '600', fontSize: 14 },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.divider,
   },
-  rowLeft: { flex: 1, fontSize: 13, color: '#444', marginRight: 8 },
-  rowAmount: { fontSize: 14, fontWeight: '600' },
-  empty: { color: '#aaa', fontSize: 14, fontStyle: 'italic', marginTop: 12 },
+  rowLeft: { flex: 1, fontSize: 13, color: colors.inkMuted, marginRight: spacing.sm },
+  rowAmount: { fontSize: 14, fontWeight: '600', color: colors.ink },
+  emptyText: { color: colors.inkLight, fontSize: 14, fontStyle: 'italic', marginTop: spacing.md },
   errorBanner: {
-    backgroundColor: '#FFF3F3',
+    backgroundColor: colors.dangerLight,
     borderWidth: 1,
-    borderColor: '#FFCDD2',
-    borderRadius: 10,
+    borderColor: colors.danger,
+    borderRadius: radius.md,
     padding: 14,
-    marginTop: 8,
+    marginTop: spacing.sm,
     alignItems: 'center',
-    gap: 10,
+    gap: spacing.sm,
   },
-  errorBannerText: { color: '#c62828', fontSize: 14, textAlign: 'center' },
+  errorBannerText: { color: colors.danger, fontSize: 14, textAlign: 'center' },
   retryBtn: {
     borderWidth: 1,
-    borderColor: '#c62828',
-    borderRadius: 8,
+    borderColor: colors.danger,
+    borderRadius: radius.sm,
     paddingVertical: 6,
     paddingHorizontal: 16,
   },
-  retryBtnText: { color: '#c62828', fontSize: 13, fontWeight: '600' },
-  exportBtn: {
-    marginTop: 20,
-    marginBottom: 32,
-    borderWidth: 1,
-    borderColor: '#2D6A4F',
-    borderRadius: 10,
-    padding: 14,
-    alignItems: 'center',
-  },
-  exportBtnDisabled: { opacity: 0.5 },
-  exportBtnText: { color: '#2D6A4F', fontWeight: '600', fontSize: 14 },
+  retryBtnText: { color: colors.danger, fontSize: 13, fontWeight: '600' },
+  exportBtn: { marginTop: spacing.lg, marginBottom: spacing.xl },
 });

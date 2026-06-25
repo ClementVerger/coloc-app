@@ -12,6 +12,12 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { addExpense, getGroupMembers, scanReceipt } from '../services/api';
 import { useApp } from '../context/AppContext';
+import Button from '../components/Button';
+import Card from '../components/Card';
+import Input from '../components/Input';
+import { theme } from '../theme/theme';
+
+const { colors, spacing, radius } = theme;
 
 const CATEGORIES = [
   { key: 'electricite', label: 'Électricité / gaz' },
@@ -20,8 +26,6 @@ const CATEGORIES = [
   { key: 'autre',       label: 'Autre' },
 ];
 
-// Répartition égale par défaut : base arrondie à l'entier, le dernier membre
-// absorbe le reliquat pour que le total soit toujours exactement 100.
 function initEqualShares(members) {
   if (members.length === 0) return {};
   const base = Math.floor(100 / members.length);
@@ -40,12 +44,10 @@ export default function AddExpenseScreen({ navigation }) {
 
   const [members, setMembers] = useState([]);
   const [membersLoading, setMembersLoading] = useState(false);
-  // shares : { [userId]: percentageString }
   const [shares, setShares] = useState({});
 
   const [submitting, setSubmitting] = useState(false);
   const [scanning, setScanning] = useState(false);
-  // 'success' | 'failure' | null
   const [scanHint, setScanHint] = useState(null);
 
   useEffect(() => {
@@ -129,7 +131,7 @@ export default function AddExpenseScreen({ navigation }) {
     let sharesPayload;
     if (splitType === 'prorata') {
       if (members.length === 0) {
-        Alert.alert('Erreur', 'Les membres de la coloc n\'ont pas pu être chargés.');
+        Alert.alert('Erreur', "Les membres de la coloc n'ont pas pu être chargés.");
         return;
       }
       if (!totalOk) {
@@ -154,14 +156,18 @@ export default function AddExpenseScreen({ navigation }) {
       });
       navigation.goBack();
     } catch (err) {
-      Alert.alert('Erreur', err?.response?.data?.error || 'Impossible d\'enregistrer la dépense.');
+      Alert.alert('Erreur', err?.response?.data?.error || "Impossible d'enregistrer la dépense.");
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      keyboardShouldPersistTaps="handled"
+    >
       {/* ── Scanner un ticket ── */}
       <TouchableOpacity
         style={[styles.scanBtn, scanning && styles.scanBtnDisabled]}
@@ -170,18 +176,18 @@ export default function AddExpenseScreen({ navigation }) {
       >
         {scanning ? (
           <>
-            <ActivityIndicator color={ACTIVE_COLOR} style={{ marginRight: 8 }} />
+            <ActivityIndicator color={colors.terracotta} style={{ marginRight: 8 }} />
             <Text style={styles.scanBtnText}>Analyse du ticket...</Text>
           </>
         ) : (
-          <Text style={styles.scanBtnText}>Scanner un ticket</Text>
+          <Text style={styles.scanBtnText}>📷  Scanner un ticket</Text>
         )}
       </TouchableOpacity>
 
       {/* ── Montant ── */}
-      <Text style={styles.label}>Montant (€)</Text>
-      <TextInput
-        style={styles.input}
+      <Input
+        label="Montant (€)"
+        style={styles.amountInput}
         keyboardType="decimal-pad"
         value={amount}
         onChangeText={setAmount}
@@ -197,7 +203,7 @@ export default function AddExpenseScreen({ navigation }) {
       )}
 
       {/* ── Catégorie ── */}
-      <Text style={styles.label}>Catégorie</Text>
+      <Text style={styles.sectionLabel}>Catégorie</Text>
       <View style={styles.chipRow}>
         {CATEGORIES.map((cat) => (
           <TouchableOpacity
@@ -213,7 +219,7 @@ export default function AddExpenseScreen({ navigation }) {
       </View>
 
       {/* ── Répartition ── */}
-      <Text style={styles.label}>Répartition</Text>
+      <Text style={styles.sectionLabel}>Répartition</Text>
       <View style={styles.chipRow}>
         {[
           { key: 'equal',   label: 'Égale' },
@@ -233,9 +239,9 @@ export default function AddExpenseScreen({ navigation }) {
 
       {/* ── Saisie prorata ── */}
       {splitType === 'prorata' && (
-        <View style={styles.prorataBox}>
+        <Card style={styles.prorataCard}>
           {membersLoading ? (
-            <ActivityIndicator />
+            <ActivityIndicator color={colors.terracotta} />
           ) : members.length === 0 ? (
             <Text style={styles.errorText}>Impossible de charger les membres.</Text>
           ) : (
@@ -255,7 +261,6 @@ export default function AddExpenseScreen({ navigation }) {
                 </View>
               ))}
 
-              {/* Total temps réel */}
               <View style={[styles.totalRow, !totalOk && styles.totalRowError]}>
                 <Text style={styles.totalLabel}>Total</Text>
                 <Text style={[styles.totalValue, !totalOk && styles.totalValueError]}>
@@ -269,119 +274,101 @@ export default function AddExpenseScreen({ navigation }) {
               )}
             </>
           )}
-        </View>
+        </Card>
       )}
 
       {/* ── Soumettre ── */}
-      <TouchableOpacity
-        style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
+      <Button
         onPress={handleSubmit}
-        disabled={submitting}
+        loading={submitting}
+        style={styles.submitBtn}
       >
-        {submitting ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.submitBtnText}>Enregistrer la dépense</Text>
-        )}
-      </TouchableOpacity>
+        Enregistrer la dépense
+      </Button>
     </ScrollView>
   );
 }
 
-const ACTIVE_COLOR = '#2D6A4F';
-
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: colors.cream },
+  contentContainer: { padding: spacing.base, paddingBottom: spacing.xl * 2 },
 
   scanBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: ACTIVE_COLOR,
-    borderRadius: 10,
-    padding: 12,
-    marginTop: 8,
-    backgroundColor: '#f0f7f4',
+    borderColor: colors.terracotta,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.base,
+    backgroundColor: colors.terracottaLight,
   },
   scanBtnDisabled: { opacity: 0.6 },
-  scanBtnText: { color: ACTIVE_COLOR, fontSize: 15, fontWeight: '600' },
-  scanHintSuccess: { fontSize: 12, color: ACTIVE_COLOR, marginTop: 6 },
-  scanHintFailure: { fontSize: 12, color: '#e53935', marginTop: 6 },
+  scanBtnText: { color: colors.terracotta, fontSize: 15, fontWeight: '600' },
+  scanHintSuccess: { fontSize: 12, color: colors.avocado, marginTop: spacing.xs, marginBottom: spacing.sm },
+  scanHintFailure: { fontSize: 12, color: colors.danger, marginTop: spacing.xs, marginBottom: spacing.sm },
 
-  label: { fontSize: 13, fontWeight: '600', color: '#444', marginTop: 18, marginBottom: 6 },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 15,
+  amountInput: { marginBottom: spacing.xs },
+
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.inkMuted,
+    marginTop: spacing.base,
+    marginBottom: spacing.sm,
   },
 
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: {
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 20,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
     paddingVertical: 6,
     paddingHorizontal: 14,
-    backgroundColor: '#f7f7f7',
+    backgroundColor: colors.paper,
   },
-  chipActive: { backgroundColor: ACTIVE_COLOR, borderColor: ACTIVE_COLOR },
-  chipText: { fontSize: 13, color: '#555' },
-  chipTextActive: { color: '#fff', fontWeight: '600' },
+  chipActive: { backgroundColor: colors.terracotta, borderColor: colors.terracotta },
+  chipText: { fontSize: 13, color: colors.inkMuted },
+  chipTextActive: { color: colors.white, fontWeight: '600' },
 
-  prorataBox: {
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 10,
-    padding: 12,
-    backgroundColor: '#fafafa',
-  },
+  prorataCard: { marginTop: spacing.md },
   memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.divider,
   },
-  memberName: { flex: 1, fontSize: 14, marginRight: 8 },
+  memberName: { flex: 1, fontSize: 14, color: colors.ink, marginRight: spacing.sm },
   percentWrapper: { flexDirection: 'row', alignItems: 'center' },
   percentInput: {
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 6,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
     padding: 6,
     width: 64,
     textAlign: 'right',
     fontSize: 14,
+    color: colors.ink,
+    backgroundColor: colors.white,
   },
-  percentSign: { marginLeft: 4, fontSize: 14, color: '#555' },
+  percentSign: { marginLeft: spacing.xs, fontSize: 14, color: colors.inkMuted },
 
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 10,
-    paddingTop: 8,
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: colors.divider,
   },
-  totalRowError: { borderTopColor: '#e53935' },
-  totalLabel: { fontSize: 14, fontWeight: '600' },
-  totalValue: { fontSize: 14, fontWeight: '700', color: ACTIVE_COLOR },
-  totalValueError: { color: '#e53935' },
-  errorText: { fontSize: 12, color: '#e53935', marginTop: 6 },
+  totalRowError: { borderTopColor: colors.danger },
+  totalLabel: { fontSize: 14, fontWeight: '600', color: colors.ink },
+  totalValue: { fontSize: 14, fontWeight: '700', color: colors.avocado },
+  totalValueError: { color: colors.danger },
+  errorText: { fontSize: 12, color: colors.danger, marginTop: spacing.xs },
 
-  submitBtn: {
-    backgroundColor: ACTIVE_COLOR,
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 32,
-  },
-  submitBtnDisabled: { opacity: 0.6 },
-  submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  submitBtn: { marginTop: spacing.xl },
 });

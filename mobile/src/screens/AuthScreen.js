@@ -2,21 +2,24 @@ import { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { useSignIn, useSignUp } from '@clerk/clerk-expo';
+import Button from '../components/Button';
+import Input from '../components/Input';
+import { theme } from '../theme/theme';
+
+const { colors, spacing, radius } = theme;
 
 export default function AuthScreen() {
   const { signIn, setActive: setSignInActive, isLoaded: signInLoaded } = useSignIn();
   const { signUp, setActive: setSignUpActive, isLoaded: signUpLoaded } = useSignUp();
 
-  const [mode, setMode] = useState('signin'); // 'signin' | 'signup'
+  const [mode, setMode] = useState('signin');
   const [pendingVerification, setPendingVerification] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -75,12 +78,15 @@ export default function AuthScreen() {
 
   if (pendingVerification) {
     return (
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.container}
+      >
         <Text style={styles.title}>Vérifiez votre email</Text>
         <Text style={styles.subtitle}>Un code à 6 chiffres a été envoyé à {email}</Text>
 
-        <TextInput
-          style={styles.input}
+        <Input
+          style={styles.field}
           placeholder="Code de vérification"
           value={code}
           onChangeText={setCode}
@@ -88,15 +94,18 @@ export default function AuthScreen() {
           autoFocus
         />
 
-        <TouchableOpacity style={styles.button} onPress={handleVerifyEmail} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Valider</Text>}
-        </TouchableOpacity>
+        <Button onPress={handleVerifyEmail} loading={loading}>
+          Valider
+        </Button>
       </KeyboardAvoidingView>
     );
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.container}
+    >
       <Text style={styles.title}>Coloc'</Text>
       <Text style={styles.subtitle}>Gérez vos dépenses entre colocataires</Text>
 
@@ -116,8 +125,8 @@ export default function AuthScreen() {
       </View>
 
       {mode === 'signup' && (
-        <TextInput
-          style={styles.input}
+        <Input
+          style={styles.field}
           placeholder="Prénom"
           value={name}
           onChangeText={setName}
@@ -125,8 +134,8 @@ export default function AuthScreen() {
         />
       )}
 
-      <TextInput
-        style={styles.input}
+      <Input
+        style={styles.field}
         placeholder="Email"
         value={email}
         onChangeText={setEmail}
@@ -135,53 +144,62 @@ export default function AuthScreen() {
         autoCorrect={false}
       />
 
-      <TextInput
-        style={styles.input}
+      <Input
+        style={styles.field}
         placeholder="Mot de passe"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
       />
 
-      <TouchableOpacity
-        style={styles.button}
+      <Button
         onPress={mode === 'signin' ? handleSignIn : handleSignUp}
-        disabled={loading}
+        loading={loading}
+        style={styles.submitBtn}
       >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>{mode === 'signin' ? 'Se connecter' : "S'inscrire"}</Text>
-        )}
-      </TouchableOpacity>
+        {mode === 'signin' ? 'Se connecter' : "S'inscrire"}
+      </Button>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#FBF4E6' },
-  title: { fontSize: 32, fontWeight: '700', textAlign: 'center', marginBottom: 8 },
-  subtitle: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 32 },
-  tabs: { flexDirection: 'row', marginBottom: 20, borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#ddd' },
-  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: '#fff' },
-  activeTab: { backgroundColor: '#2D6A4F' },
-  tabText: { fontSize: 14, color: '#333' },
-  activeTabText: { color: '#fff', fontWeight: '600' },
-  input: {
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: spacing.lg,
+    backgroundColor: colors.cream,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: colors.ink,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: colors.inkMuted,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+  },
+  tabs: {
+    flexDirection: 'row',
+    marginBottom: spacing.lg,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 12,
-    backgroundColor: '#fff',
-    fontSize: 15,
+    borderColor: colors.border,
   },
-  button: {
-    backgroundColor: '#2D6A4F',
-    borderRadius: 10,
-    padding: 16,
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
     alignItems: 'center',
-    marginTop: 4,
+    backgroundColor: colors.white,
   },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  activeTab: { backgroundColor: colors.terracotta },
+  tabText: { fontSize: 14, color: colors.inkMuted },
+  activeTabText: { color: colors.white, fontWeight: '600' },
+  field: { marginBottom: spacing.md },
+  submitBtn: { marginTop: spacing.xs },
 });

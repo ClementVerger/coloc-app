@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, FlatList, StyleSheet,
-  ActivityIndicator, TouchableOpacity, Alert,
+  ActivityIndicator, Alert,
 } from 'react-native';
 import { getGroupMembers, leaveGroup, getMyGroups } from '../services/api';
 import { useApp } from '../context/AppContext';
+import Button from '../components/Button';
+import ScreenContainer from '../components/ScreenContainer';
+import { theme } from '../theme/theme';
+
+const { colors, spacing, radius } = theme;
 
 export default function GroupSettingsScreen({ navigation }) {
-  const { currentGroup, dbUser, setCurrentGroup, setMyGroups } = useApp();
+  const { currentGroup, dbUser, setMyGroups, selectGroup } = useApp();
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [leaving, setLeaving] = useState(false);
@@ -36,17 +41,14 @@ export default function GroupSettingsScreen({ navigation }) {
     try {
       await leaveGroup(currentGroup.id);
 
-      // Recharge la liste des colocs restantes
       const groupsRes = await getMyGroups();
       const remaining = groupsRes.data;
       setMyGroups(remaining);
 
       if (remaining.length === 1) {
-        // Auto-sélection de la seule coloc restante
-        setCurrentGroup(remaining[0]);
+        await selectGroup(remaining[0]);
       } else {
-        // 0 coloc → Onboarding | 2+ colocs → GroupSelector (via navigator)
-        setCurrentGroup(null);
+        await selectGroup(null);
       }
     } catch (err) {
       Alert.alert('Impossible de quitter', err?.response?.data?.error || 'Une erreur est survenue.');
@@ -55,11 +57,17 @@ export default function GroupSettingsScreen({ navigation }) {
     }
   };
 
-  if (loading) return <ActivityIndicator style={styles.center} />;
+  if (loading) {
+    return (
+      <ScreenContainer centered>
+        <ActivityIndicator color={colors.terracotta} />
+      </ScreenContainer>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.groupName}>{currentGroup?.name}</Text>
+    <ScreenContainer>
+      <Text style={styles.groupSubtitle}>{currentGroup?.name}</Text>
 
       <Text style={styles.sectionTitle}>Membres actifs</Text>
       <FlatList
@@ -77,7 +85,6 @@ export default function GroupSettingsScreen({ navigation }) {
         )}
       />
 
-      {/* Bouton quitter — visible uniquement pour l'utilisateur lui-même */}
       <View style={styles.leaveSection}>
         <Text style={styles.warningText}>
           ⚠ Si vous quittez la coloc, les dépenses passées restent enregistrées et vos soldes
@@ -86,59 +93,50 @@ export default function GroupSettingsScreen({ navigation }) {
           Note MVP : aucun recalcul rétroactif n'est effectué.
         </Text>
 
-        <TouchableOpacity
-          style={[styles.leaveBtn, leaving && styles.leaveBtnDisabled]}
-          onPress={confirmLeave}
-          disabled={leaving}
-        >
-          {leaving ? (
-            <ActivityIndicator color="#e53935" />
-          ) : (
-            <Text style={styles.leaveBtnText}>Quitter cette coloc</Text>
-          )}
-        </TouchableOpacity>
+        <Button variant="danger" onPress={confirmLeave} loading={leaving}>
+          Quitter cette coloc
+        </Button>
       </View>
-    </View>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#fff' },
-  center: { flex: 1, justifyContent: 'center' },
-  groupName: { fontSize: 13, color: '#888', marginBottom: 12, marginTop: 4 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
+  groupSubtitle: {
+    fontSize: 13,
+    color: colors.inkMuted,
+    marginBottom: spacing.md,
+    marginTop: spacing.xs,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.ink,
+    marginBottom: spacing.sm,
+  },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.divider,
   },
-  memberName: { fontSize: 15, fontWeight: '500' },
-  memberEmail: { fontSize: 12, color: '#888', marginTop: 2 },
-  role: { fontSize: 12, color: '#2D6A4F', fontWeight: '600' },
+  memberName: { fontSize: 15, fontWeight: '500', color: colors.ink },
+  memberEmail: { fontSize: 12, color: colors.inkLight, marginTop: 2 },
+  role: { fontSize: 12, color: colors.slate, fontWeight: '600' },
   leaveSection: {
-    marginTop: 32,
-    padding: 16,
-    backgroundColor: '#FFF5F5',
-    borderRadius: 12,
+    marginTop: spacing.xl,
+    padding: spacing.base,
+    backgroundColor: colors.dangerLight,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: '#FFCDD2',
+    borderColor: colors.danger,
+    gap: spacing.base,
   },
   warningText: {
     fontSize: 13,
-    color: '#555',
+    color: colors.inkMuted,
     lineHeight: 20,
-    marginBottom: 16,
   },
-  leaveBtn: {
-    borderWidth: 1.5,
-    borderColor: '#e53935',
-    borderRadius: 10,
-    padding: 14,
-    alignItems: 'center',
-  },
-  leaveBtnDisabled: { opacity: 0.5 },
-  leaveBtnText: { color: '#e53935', fontWeight: '600', fontSize: 15 },
 });

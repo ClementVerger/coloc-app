@@ -2,7 +2,6 @@ import { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
@@ -14,19 +13,22 @@ import {
 import { useAuth } from '@clerk/clerk-expo';
 import { createGroup, joinGroupByCode, getMyGroups } from '../services/api';
 import { useApp } from '../context/AppContext';
+import Button from '../components/Button';
+import Input from '../components/Input';
+import { theme } from '../theme/theme';
 
-export default function OnboardingScreen() {
+const { colors, spacing, radius } = theme;
+
+export default function OnboardingScreen({ navigation }) {
   const { signOut } = useAuth();
-  const { setMyGroups, setCurrentGroup } = useApp();
-  const [mode, setMode] = useState('create'); // 'create' | 'join'
+  const { setMyGroups, selectGroup } = useApp();
+  const [mode, setMode] = useState('create');
   const [loading, setLoading] = useState(false);
 
-  // Formulaire création
   const [groupName, setGroupName] = useState('');
   const [address, setAddress] = useState('');
   const [leaseStart, setLeaseStart] = useState('');
 
-  // Formulaire rejoindre
   const [inviteCode, setInviteCode] = useState('');
 
   const handleCreate = async () => {
@@ -42,8 +44,10 @@ export default function OnboardingScreen() {
         leaseStartDate: leaseStart.trim() || null,
       });
       const newGroup = res.data;
-      setMyGroups([newGroup]);
-      setCurrentGroup(newGroup);
+      const groupsRes = await getMyGroups();
+      setMyGroups(groupsRes.data);
+      await selectGroup(newGroup);
+      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     } catch (err) {
       Alert.alert('Erreur', err?.response?.data?.error || 'Impossible de créer la coloc.');
     } finally {
@@ -54,17 +58,17 @@ export default function OnboardingScreen() {
   const handleJoin = async () => {
     const code = inviteCode.trim().toUpperCase();
     if (code.length !== 6) {
-      Alert.alert('Code invalide', 'Le code d\'invitation fait 6 caractères.');
+      Alert.alert('Code invalide', "Le code d'invitation fait 6 caractères.");
       return;
     }
     setLoading(true);
     try {
-      await joinGroupByCode(code);
-      // Recharge la liste complète pour être synchronisé
+      const joinRes = await joinGroupByCode(code);
+      const joinedGroup = joinRes.data;
       const groupsRes = await getMyGroups();
-      const groups = groupsRes.data;
-      setMyGroups(groups);
-      if (groups.length === 1) setCurrentGroup(groups[0]);
+      setMyGroups(groupsRes.data);
+      await selectGroup(joinedGroup);
+      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     } catch (err) {
       Alert.alert('Erreur', err?.response?.data?.error || 'Code invalide ou expiré.');
     } finally {
@@ -102,59 +106,52 @@ export default function OnboardingScreen() {
 
         {mode === 'create' ? (
           <>
-            <Text style={styles.label}>Nom de la coloc *</Text>
-            <TextInput
-              style={styles.input}
+            <Input
+              label="Nom de la coloc *"
+              style={styles.field}
               placeholder="Ex : Appart Belleville"
               value={groupName}
               onChangeText={setGroupName}
             />
 
-            <Text style={styles.label}>Adresse</Text>
-            <TextInput
-              style={styles.input}
+            <Input
+              label="Adresse"
+              style={styles.field}
               placeholder="Ex : 12 rue des Lilas, Paris"
               value={address}
               onChangeText={setAddress}
             />
 
-            <Text style={styles.label}>Date de début de bail</Text>
-            <TextInput
-              style={styles.input}
+            <Input
+              label="Date de début de bail"
+              style={styles.field}
               placeholder="AAAA-MM-JJ"
               value={leaseStart}
               onChangeText={setLeaseStart}
               keyboardType="numbers-and-punctuation"
             />
 
-            <TouchableOpacity style={styles.button} onPress={handleCreate} disabled={loading}>
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>Créer la coloc</Text>
-              )}
-            </TouchableOpacity>
+            <Button onPress={handleCreate} loading={loading} style={styles.submitBtn}>
+              Créer la coloc
+            </Button>
           </>
         ) : (
           <>
-            <Text style={styles.label}>Code d'invitation (6 caractères)</Text>
-            <TextInput
-              style={[styles.input, styles.codeInput]}
+            <Input
+              label="Code d'invitation (6 caractères)"
+              style={styles.field}
               placeholder="AB12CD"
               value={inviteCode}
               onChangeText={(t) => setInviteCode(t.toUpperCase())}
               autoCapitalize="characters"
               maxLength={6}
+              inputStyle={styles.codeInputStyle}
             />
             <Text style={styles.hint}>Demandez le code à un colocataire depuis son écran d'invitation.</Text>
 
-            <TouchableOpacity style={styles.button} onPress={handleJoin} disabled={loading}>
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>Rejoindre</Text>
-              )}
-            </TouchableOpacity>
+            <Button onPress={handleJoin} loading={loading} style={styles.submitBtn}>
+              Rejoindre
+            </Button>
           </>
         )}
       </ScrollView>
@@ -163,45 +160,56 @@ export default function OnboardingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, padding: 24, backgroundColor: '#FBF4E6', justifyContent: 'center' },
-  title: { fontSize: 28, fontWeight: '700', textAlign: 'center', marginBottom: 8 },
-  subtitle: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 28 },
+  container: {
+    flexGrow: 1,
+    padding: spacing.lg,
+    backgroundColor: colors.cream,
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: colors.ink,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: colors.inkMuted,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+  },
   tabs: {
     flexDirection: 'row',
-    marginBottom: 20,
-    borderRadius: 8,
+    marginBottom: spacing.lg,
+    borderRadius: radius.sm,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.border,
   },
-  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: '#fff' },
-  activeTab: { backgroundColor: '#2D6A4F' },
-  tabText: { fontSize: 14, color: '#333' },
-  activeTabText: { color: '#fff', fontWeight: '600' },
-  label: { fontSize: 13, marginTop: 12, marginBottom: 4, color: '#444' },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 10,
-    padding: 14,
-    backgroundColor: '#fff',
-    fontSize: 15,
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: colors.white,
   },
-  codeInput: {
+  activeTab: { backgroundColor: colors.terracotta },
+  tabText: { fontSize: 14, color: colors.inkMuted },
+  activeTabText: { color: colors.white, fontWeight: '600' },
+  field: { marginBottom: spacing.md },
+  codeInputStyle: {
     textAlign: 'center',
     fontSize: 24,
     fontWeight: '700',
     letterSpacing: 8,
   },
-  hint: { fontSize: 12, color: '#888', marginTop: 6, marginBottom: 4 },
-  button: {
-    backgroundColor: '#2D6A4F',
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 20,
+  hint: { fontSize: 12, color: colors.inkLight, marginTop: spacing.xs, marginBottom: spacing.sm },
+  submitBtn: { marginTop: spacing.sm },
+  signOutBtn: {
+    alignSelf: 'flex-end',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.sm,
   },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  signOutBtn: { alignSelf: 'flex-end', paddingVertical: 4, paddingHorizontal: 8, marginBottom: 8 },
-  signOutText: { color: '#999', fontSize: 13 },
+  signOutText: { color: colors.inkLight, fontSize: 13 },
 });

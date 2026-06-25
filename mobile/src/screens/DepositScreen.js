@@ -2,8 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
@@ -11,6 +9,11 @@ import {
 } from 'react-native';
 import { getDeposit, addDeposit } from '../services/api';
 import { useApp } from '../context/AppContext';
+import Button from '../components/Button';
+import Input from '../components/Input';
+import { theme } from '../theme/theme';
+
+const { colors, spacing, radius } = theme;
 
 export default function DepositScreen() {
   const { currentGroup } = useApp();
@@ -48,25 +51,31 @@ export default function DepositScreen() {
       setAmount('');
       await loadDeposit();
     } catch (err) {
-      Alert.alert('Erreur', err?.response?.data?.error || 'Impossible d\'enregistrer la contribution.');
+      Alert.alert('Erreur', err?.response?.data?.error || "Impossible d'enregistrer la contribution.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (loading) return <ActivityIndicator style={styles.center} />;
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator color={colors.terracotta} />
+      </View>
+    );
+  }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       {/* ── Récapitulatif ── */}
       <View style={styles.totalCard}>
-        <Text style={styles.totalLabel}>Total versé</Text>
-        <Text style={styles.totalAmount}>{deposit?.total?.toFixed(2) ?? '0.00'} €</Text>
+        <Text style={styles.totalCardLabel}>Total versé</Text>
+        <Text style={styles.totalCardAmount}>{deposit?.total?.toFixed(2) ?? '0.00'} €</Text>
       </View>
 
       <Text style={styles.sectionTitle}>Contributions</Text>
       {deposit?.contributions?.length === 0 ? (
-        <Text style={styles.empty}>Aucune contribution enregistrée.</Text>
+        <Text style={styles.emptyText}>Aucune contribution enregistrée.</Text>
       ) : (
         deposit?.contributions?.map((c) => (
           <View key={c.user_id} style={styles.row}>
@@ -82,75 +91,62 @@ export default function DepositScreen() {
         Chaque versement est ajouté au total de la coloc. Vous pouvez en saisir plusieurs.
       </Text>
 
-      <Text style={styles.label}>Montant (€)</Text>
-      <TextInput
-        style={styles.input}
+      <Input
+        label="Montant (€)"
+        style={styles.amountInput}
         keyboardType="decimal-pad"
         value={amount}
         onChangeText={setAmount}
         placeholder="0.00"
       />
 
-      <TouchableOpacity
-        style={[styles.button, submitting && styles.buttonDisabled]}
-        onPress={handleSubmit}
-        disabled={submitting}
-      >
-        {submitting ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Enregistrer ma contribution</Text>
-        )}
-      </TouchableOpacity>
+      <Button onPress={handleSubmit} loading={submitting}>
+        Enregistrer ma contribution
+      </Button>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#fff' },
-  center: { flex: 1, justifyContent: 'center' },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.cream,
+  },
+  container: { flex: 1, backgroundColor: colors.cream },
+  contentContainer: { padding: spacing.base, paddingBottom: spacing.xl * 2 },
 
   totalCard: {
-    backgroundColor: '#2D6A4F',
-    borderRadius: 14,
-    padding: 20,
+    backgroundColor: colors.slate,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
     alignItems: 'center',
-    marginBottom: 20,
-    marginTop: 4,
+    marginBottom: spacing.lg,
+    marginTop: spacing.xs,
   },
-  totalLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 13, marginBottom: 4 },
-  totalAmount: { color: '#fff', fontSize: 36, fontWeight: '700' },
+  totalCardLabel: { color: 'rgba(255,255,255,0.75)', fontSize: 13, marginBottom: spacing.xs },
+  totalCardAmount: { color: colors.white, fontSize: 36, fontWeight: '700' },
 
-  sectionTitle: { fontSize: 16, fontWeight: '600', marginTop: 20, marginBottom: 10 },
-  empty: { color: '#aaa', fontSize: 14, fontStyle: 'italic' },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.ink,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  emptyText: { color: colors.inkLight, fontSize: 14, fontStyle: 'italic' },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.divider,
   },
-  memberName: { fontSize: 14 },
-  memberAmount: { fontSize: 14, fontWeight: '600', color: '#333' },
+  memberName: { fontSize: 14, color: colors.ink },
+  memberAmount: { fontSize: 14, fontWeight: '600', color: colors.ink },
 
-  hint: { fontSize: 12, color: '#888', marginBottom: 12, lineHeight: 18 },
-  label: { fontSize: 13, fontWeight: '600', color: '#444', marginBottom: 6 },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 15,
-    marginBottom: 16,
-  },
-  button: {
-    backgroundColor: '#2D6A4F',
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  hint: { fontSize: 12, color: colors.inkLight, marginBottom: spacing.md, lineHeight: 18 },
+  amountInput: { marginBottom: spacing.base },
 });

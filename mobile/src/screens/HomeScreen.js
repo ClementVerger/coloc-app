@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, Button, FlatList,
-  ActivityIndicator, TouchableOpacity, Platform, AppState,
+  View, Text, StyleSheet, FlatList,
+  ActivityIndicator, TouchableOpacity, AppState,
 } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
 import * as Notifications from 'expo-notifications';
 import { getBalances, getExpenses, savePushToken } from '../services/api';
 import { useApp } from '../context/AppContext';
+import Button from '../components/Button';
+import Badge from '../components/Badge';
+import ScreenContainer from '../components/ScreenContainer';
+import { theme } from '../theme/theme';
+
+const { colors, spacing, radius } = theme;
 
 async function registerForPushNotificationsAsync() {
   try {
@@ -17,7 +23,6 @@ async function registerForPushNotificationsAsync() {
       finalStatus = status;
     }
     if (finalStatus !== 'granted') return null;
-
     const token = (await Notifications.getExpoPushTokenAsync()).data;
     return token;
   } catch {
@@ -36,9 +41,21 @@ export default function HomeScreen({ navigation }) {
   const pushRegistered = useRef(false);
   const appState = useRef(AppState.currentState);
 
-  // Boutons "Paramètres" et "Inviter" dans le header
   useEffect(() => {
     navigation.setOptions({
+      headerStyle: { backgroundColor: colors.cream },
+      headerShadowVisible: false,
+      headerTitle: () => (
+        <TouchableOpacity
+          onPress={() => navigation.navigate('GroupSelector')}
+          style={styles.headerTitleBtn}
+        >
+          <Text style={styles.headerTitleText} numberOfLines={1}>
+            {currentGroup?.name ?? 'Ma coloc'}
+          </Text>
+          <Text style={styles.headerTitleChevron}>▾</Text>
+        </TouchableOpacity>
+      ),
       headerRight: () => (
         <View style={styles.headerBtns}>
           <TouchableOpacity onPress={() => navigation.navigate('GroupSettings')}>
@@ -50,13 +67,11 @@ export default function HomeScreen({ navigation }) {
         </View>
       ),
     });
-  }, [navigation]);
+  }, [navigation, currentGroup]);
 
-  // Enregistrement du push token après chargement du profil utilisateur
   useEffect(() => {
     if (!dbUser || pushRegistered.current) return;
     pushRegistered.current = true;
-
     registerForPushNotificationsAsync().then((token) => {
       if (token) {
         savePushToken(token).catch((err) =>
@@ -66,7 +81,6 @@ export default function HomeScreen({ navigation }) {
     });
   }, [dbUser]);
 
-  // I6 — Chargement avec état d'erreur visible et bouton "Réessayer"
   const loadData = useCallback(async () => {
     if (!currentGroup) { setLoading(false); return; }
     setLoading(true);
@@ -90,43 +104,44 @@ export default function HomeScreen({ navigation }) {
     loadData();
   }, [loadData]);
 
-  // Polling toutes les 30s + refresh immédiat quand l'app revient au premier plan
   useEffect(() => {
     if (!currentGroup) return;
-
     const interval = setInterval(loadData, 30_000);
-
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (appState.current.match(/inactive|background/) && nextState === 'active') {
         loadData();
       }
       appState.current = nextState;
     });
-
     return () => {
       clearInterval(interval);
       subscription.remove();
     };
   }, [currentGroup, loadData]);
 
-  if (loading) return <ActivityIndicator style={styles.center} />;
+  if (loading) {
+    return (
+      <ScreenContainer centered>
+        <ActivityIndicator color={colors.terracotta} />
+      </ScreenContainer>
+    );
+  }
 
   if (!currentGroup) {
     return (
-      <View style={styles.container}>
+      <ScreenContainer>
         <Text style={styles.sectionTitle}>Bienvenue, {dbUser?.name} !</Text>
-        <Text style={{ color: '#666', marginTop: 8 }}>
+        <Text style={styles.emptyText}>
           Vous n'êtes encore membre d'aucune coloc. Créez ou rejoignez-en une.
         </Text>
-      </View>
+      </ScreenContainer>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.groupName}>{currentGroup.name}</Text>
+    <ScreenContainer>
+      <Text style={styles.groupSubtitle}>{currentGroup.name}</Text>
 
-      {/* I6 — Bandeau d'erreur avec bouton Réessayer */}
       {loadError && (
         <View style={styles.errorBanner}>
           <Text style={styles.errorBannerText}>
@@ -146,10 +161,11 @@ export default function HomeScreen({ navigation }) {
             keyExtractor={(item) => item.userId}
             renderItem={({ item }) => (
               <View style={styles.row}>
-                <Text>{item.name}</Text>
-                <Text style={item.netBalance >= 0 ? styles.positive : styles.negative}>
-                  {Number(item.netBalance).toFixed(2)} €
-                </Text>
+                <Text style={styles.memberName}>{item.name}</Text>
+                <Badge
+                  type={item.netBalance >= 0 ? 'positive' : 'negative'}
+                  value={`${item.netBalance >= 0 ? '+' : ''}${Number(item.netBalance).toFixed(2)} €`}
+                />
               </View>
             )}
           />
@@ -160,48 +176,88 @@ export default function HomeScreen({ navigation }) {
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <View style={styles.row}>
-                <Text>{item.category}</Text>
-                <Text>{Number(item.amount).toFixed(2)} €</Text>
+                <Text style={styles.expenseCategory}>{item.category}</Text>
+                <Text style={styles.expenseAmount}>{Number(item.amount).toFixed(2)} €</Text>
               </View>
             )}
           />
         </>
       )}
 
-      <Button title="+ Ajouter une dépense" onPress={() => navigation.navigate('AddExpense')} />
-      <Button title="Voir l'historique" onPress={() => navigation.navigate('History')} />
-      <Button title="Se déconnecter" color="#999" onPress={() => signOut()} />
-    </View>
+      <View style={styles.actions}>
+        <Button onPress={() => navigation.navigate('AddExpense')}>
+          + Ajouter une dépense
+        </Button>
+        <Button
+          variant="secondary"
+          onPress={() => navigation.navigate('History')}
+          style={styles.historyBtn}
+        >
+          Voir l'historique
+        </Button>
+        <TouchableOpacity onPress={() => signOut()} style={styles.signOutBtn}>
+          <Text style={styles.signOutText}>Se déconnecter</Text>
+        </TouchableOpacity>
+      </View>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
-  center: { flex: 1, justifyContent: 'center' },
-  groupName: { fontSize: 13, color: '#888', marginBottom: 4 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', marginTop: 16, marginBottom: 8 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 },
-  positive: { color: 'green' },
-  negative: { color: 'red' },
-  headerBtns: { flexDirection: 'row', gap: 14, marginRight: 8 },
-  headerBtnText: { color: '#2D6A4F', fontSize: 15, fontWeight: '600' },
-  errorBanner: {
-    backgroundColor: '#FFF3F3',
-    borderWidth: 1,
-    borderColor: '#FFCDD2',
-    borderRadius: 10,
-    padding: 14,
-    marginTop: 12,
-    alignItems: 'center',
-    gap: 10,
+  groupSubtitle: {
+    fontSize: 13,
+    color: colors.inkMuted,
+    marginBottom: spacing.xs,
   },
-  errorBannerText: { color: '#c62828', fontSize: 14, textAlign: 'center' },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.ink,
+    marginTop: spacing.base,
+    marginBottom: spacing.sm,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  memberName: { fontSize: 15, color: colors.ink, fontWeight: '500' },
+  expenseCategory: { fontSize: 13, color: colors.inkMuted, textTransform: 'capitalize' },
+  expenseAmount: { fontSize: 14, fontWeight: '600', color: colors.ink },
+  emptyText: { color: colors.inkMuted, marginTop: spacing.sm, fontSize: 14 },
+  actions: { marginTop: spacing.lg, gap: spacing.sm },
+  historyBtn: {},
+  signOutBtn: {
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  signOutText: { fontSize: 13, color: colors.inkLight },
+  headerTitleBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  headerTitleText: { fontSize: 16, fontWeight: '700', color: colors.ink, maxWidth: 180 },
+  headerTitleChevron: { fontSize: 12, color: colors.terracotta, marginTop: 1 },
+  headerBtns: { flexDirection: 'row', gap: 14, marginRight: 8 },
+  headerBtnText: { color: colors.terracotta, fontSize: 15, fontWeight: '600' },
+  errorBanner: {
+    backgroundColor: colors.dangerLight,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    borderRadius: radius.md,
+    padding: 14,
+    marginTop: spacing.md,
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  errorBannerText: { color: colors.danger, fontSize: 14, textAlign: 'center' },
   retryBtn: {
     borderWidth: 1,
-    borderColor: '#c62828',
-    borderRadius: 8,
+    borderColor: colors.danger,
+    borderRadius: radius.sm,
     paddingVertical: 6,
     paddingHorizontal: 16,
   },
-  retryBtnText: { color: '#c62828', fontSize: 13, fontWeight: '600' },
+  retryBtnText: { color: colors.danger, fontSize: 13, fontWeight: '600' },
 });
