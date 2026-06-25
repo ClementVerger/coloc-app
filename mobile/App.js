@@ -24,7 +24,7 @@ if (Platform.OS === 'android') {
   });
 }
 
-import { AppProvider, useApp } from './src/context/AppContext';
+import { AppProvider, useApp, SELECTED_GROUP_KEY } from './src/context/AppContext';
 import { configureTokenFetcher, syncUser, getMyGroups } from './src/services/api';
 
 import AuthScreen from './src/screens/AuthScreen';
@@ -51,10 +51,11 @@ const tokenCache = {
   },
 };
 
+
 function RootNavigation() {
   const { isSignedIn, isLoaded, getToken } = useAuth();
   const { user } = useUser();
-  const { setDbUser, myGroups, setMyGroups, currentGroup, setCurrentGroup } = useApp();
+  const { setDbUser, myGroups, setMyGroups, currentGroup, setCurrentGroup, selectGroup } = useApp();
   const [appReady, setAppReady] = useState(false);
 
   useEffect(() => {
@@ -77,12 +78,21 @@ function RootNavigation() {
 
         const groupsRes = await getMyGroups();
         const groups = groupsRes.data;
+        console.log('[DEBUG] groups from API:', JSON.stringify(groups[0]));
         setMyGroups(groups);
 
-        // Auto-sélection uniquement si une seule coloc
-        if (groups.length === 1) {
-          setCurrentGroup(groups[0]);
+        // Tente de restaurer la dernière coloc sélectionnée
+        const storedId = await SecureStore.getItemAsync(SELECTED_GROUP_KEY);
+        const restored = groups.find((g) => g.id === storedId);
+
+        if (restored) {
+          // Restauration silencieuse : l'ID est déjà persisté
+          setCurrentGroup(restored);
+        } else if (groups.length === 1) {
+          // Auto-sélection de la seule coloc et persistence
+          await selectGroup(groups[0]);
         }
+        // 0 colocs ou plusieurs sans ID stocké → GroupSelector / Onboarding
       } catch (err) {
         console.error("Erreur d'initialisation de l'app :", err?.response?.data || err.message);
       } finally {
@@ -105,10 +115,10 @@ function RootNavigation() {
     <NavigationContainer>
       <Stack.Navigator>
         {!isSignedIn ? (
-          // Non connecté → authentification
+          // Non connecté
           <Stack.Screen name="Auth" component={AuthScreen} options={{ headerShown: false }} />
         ) : currentGroup ? (
-          // Connecté + coloc sélectionnée → app principale
+          // Coloc sélectionnée → Home en premier (GroupSelector/Onboarding accessibles via navigation)
           <>
             <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Ma coloc' }} />
             <Stack.Screen name="AddExpense" component={AddExpenseScreen} options={{ title: 'Nouvelle dépense' }} />
@@ -116,13 +126,33 @@ function RootNavigation() {
             <Stack.Screen name="Invite" component={InviteScreen} options={{ title: 'Inviter' }} />
             <Stack.Screen name="Deposit" component={DepositScreen} options={{ title: 'Dépôt de garantie' }} />
             <Stack.Screen name="GroupSettings" component={GroupSettingsScreen} options={{ title: 'Paramètres' }} />
+            <Stack.Screen name="GroupSelector" component={GroupSelectorScreen} options={{ title: 'Mes colocs' }} />
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
           </>
-        ) : myGroups.length > 1 ? (
-          // Connecté + plusieurs colocs → sélecteur
-          <Stack.Screen name="GroupSelector" component={GroupSelectorScreen} options={{ title: 'Mes colocs', headerBackVisible: false }} />
+        ) : myGroups.length > 0 ? (
+          // A des colocs mais aucune sélectionnée → GroupSelector en premier
+          <>
+            <Stack.Screen name="GroupSelector" component={GroupSelectorScreen} options={{ title: 'Mes colocs', headerBackVisible: false }} />
+            <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Ma coloc' }} />
+            <Stack.Screen name="AddExpense" component={AddExpenseScreen} options={{ title: 'Nouvelle dépense' }} />
+            <Stack.Screen name="History" component={HistoryScreen} options={{ title: 'Historique' }} />
+            <Stack.Screen name="Invite" component={InviteScreen} options={{ title: 'Inviter' }} />
+            <Stack.Screen name="Deposit" component={DepositScreen} options={{ title: 'Dépôt de garantie' }} />
+            <Stack.Screen name="GroupSettings" component={GroupSettingsScreen} options={{ title: 'Paramètres' }} />
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
+          </>
         ) : (
-          // Connecté + aucune coloc → onboarding
-          <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
+          // Aucune coloc → Onboarding en premier
+          <>
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="GroupSelector" component={GroupSelectorScreen} options={{ title: 'Mes colocs' }} />
+            <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Ma coloc' }} />
+            <Stack.Screen name="AddExpense" component={AddExpenseScreen} options={{ title: 'Nouvelle dépense' }} />
+            <Stack.Screen name="History" component={HistoryScreen} options={{ title: 'Historique' }} />
+            <Stack.Screen name="Invite" component={InviteScreen} options={{ title: 'Inviter' }} />
+            <Stack.Screen name="Deposit" component={DepositScreen} options={{ title: 'Dépôt de garantie' }} />
+            <Stack.Screen name="GroupSettings" component={GroupSettingsScreen} options={{ title: 'Paramètres' }} />
+          </>
         )}
       </Stack.Navigator>
     </NavigationContainer>

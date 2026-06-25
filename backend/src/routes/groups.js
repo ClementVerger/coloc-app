@@ -62,7 +62,10 @@ router.post('/', async (req, res, next) => {
 router.get('/my', async (req, res, next) => {
   try {
     const result = await pool.query(
-      `SELECT g.*, gm.role
+      `SELECT g.id, g.name, g.address, g.invite_code, g.lease_start_date,
+              g.created_by, g.created_at, gm.role,
+              (SELECT COUNT(*)::int FROM group_members gm2
+               WHERE gm2.group_id = g.id AND gm2.active = true) AS member_count
        FROM groups g
        JOIN group_members gm ON gm.group_id = g.id
        WHERE gm.user_id = $1 AND gm.active = true
