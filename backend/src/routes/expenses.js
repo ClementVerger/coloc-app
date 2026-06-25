@@ -22,7 +22,7 @@ const upload = multer({
   },
 });
 
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-1.5-flash';
 
 // POST /expenses/scan-receipt — OCR ticket de caisse via Mindee
 // requireAuth appliqué en amont (server.js) — pas d'assertMembership car aucune donnée de groupe n'est touchée
@@ -48,7 +48,8 @@ router.post(
 
     try {
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+      // gemini-1.5-flash est disponible en v1 (pas en v1beta par défaut du SDK)
+      const model = genAI.getGenerativeModel({ model: GEMINI_MODEL }, { apiVersion: 'v1' });
 
       const result = await model.generateContent([
         { inlineData: { data: req.file.buffer.toString('base64'), mimeType: req.file.mimetype || 'image/jpeg' } },
