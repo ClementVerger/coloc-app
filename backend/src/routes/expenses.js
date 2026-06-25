@@ -105,7 +105,9 @@ router.post(
 
       const pages = response?.inference?.result?.pages ?? [];
       const fullText = pagesWordsToText(pages);
-      console.log('[OCR Mindee] texte reconstruit (300 car.):', fullText.slice(0, 300));
+      // Log les lignes contenant un chiffre (pour voir le format des montants)
+      const numericLines = fullText.split('\n').filter((l) => /\d/.test(l));
+      console.log('[OCR Mindee] lignes avec chiffres:', numericLines.join(' | ').slice(0, 600));
 
       const amount = extractAmountFromOcrText(fullText);
 
