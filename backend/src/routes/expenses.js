@@ -1,6 +1,6 @@
 const express = require('express');
 const multer = require('multer');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const mindee = require('mindee');
 const pool = require('../config/db');
 const { notifyNewExpense } = require('../utils/notifications');
 const { assertMembership } = require('../middleware/membership');
@@ -22,7 +22,25 @@ const upload = multer({
   },
 });
 
-const GEMINI_MODEL = 'gemini-flash-latest';
+// ID du modèle OCR Mindee v2 (disponible sur app.mindee.com > votre modèle OCR)
+const MINDEE_OCR_MODEL_ID = process.env.MINDEE_OCR_MODEL_ID || '9fda0748-bfac-4637-ae65-dea08ea10a18';
+
+// Extrait le montant total d'un texte OCR brut (gère , et . comme séparateur décimal)
+function extractAmountFromOcrText(text) {
+  const lines = text.split('\n');
+  // Cherche la dernière ligne contenant un mot-clé "total" suivi d'un nombre
+  const totalRe = /total\s*(?:ttc|à\s*payer|net)?[^\d]*(\d[\d\s]*[.,]\d{2})/i;
+  // Parcourt les lignes en ordre inverse pour prendre le total le plus bas (grand total)
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const m = lines[i].match(totalRe);
+    if (m) {
+      const normalized = m[1].replace(/\s/g, '').replace(',', '.');
+      const val = parseFloat(normalized);
+      if (isFinite(val) && val > 0) return val;
+    }
+  }
+  return null;
+}
 
 // POST /expenses/scan-receipt — OCR ticket de caisse via Mindee
 // requireAuth appliqué en amont (server.js) — pas d'assertMembership car aucune donnée de groupe n'est touchée
@@ -42,51 +60,38 @@ router.post(
     if (!req.file) {
       return res.status(400).json({ error: 'Aucune image reçue. Envoie le champ "receipt" en multipart/form-data.' });
     }
-    if (!process.env.GEMINI_API_KEY) {
+    if (!process.env.MINDEE_API_KEY) {
       return res.status(503).json({ error: 'Service OCR non configuré.' });
     }
 
     try {
-      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+      const client = new mindee.v2.Client({ apiKey: process.env.MINDEE_API_KEY });
+      const inputSource = new mindee.BufferInput({
+        buffer: req.file.buffer,
+        filename: req.file.originalname || 'receipt.jpg',
+      });
 
-      const result = await model.generateContent([
-        { inlineData: { data: req.file.buffer.toString('base64'), mimeType: req.file.mimetype || 'image/jpeg' } },
-        `Analyse ce ticket de caisse et extrais uniquement :
-- Le montant total final (total TTC, total à payer, grand total — pas un sous-total)
-- Le nom du commerce ou restaurant
-- La date au format YYYY-MM-DD
+      const response = await client.enqueueAndGetResult(
+        mindee.v2.product.Ocr,
+        inputSource,
+        { modelId: MINDEE_OCR_MODEL_ID }
+      );
 
-Réponds UNIQUEMENT avec du JSON valide, sans markdown, sans texte autour :
-{"amount": <nombre décimal ou null>, "merchantName": "<string ou null>", "date": "<YYYY-MM-DD ou null>"}`,
-      ]);
+      // Concatène le texte brut de toutes les pages
+      const pages = response?.inference?.result?.pages ?? [];
+      const fullText = pages.map((p) => p?.text ?? '').join('\n');
+      console.log('[OCR Mindee] texte extrait (200 car.):', fullText.slice(0, 200));
 
-      const raw = result.response.text().trim().replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
-      console.log('[OCR Gemini] réponse brute:', raw);
-
-      let parsed;
-      try {
-        parsed = JSON.parse(raw);
-      } catch {
-        console.warn('[OCR Gemini] JSON invalide:', raw);
-        return res.json({ amount: null, merchantName: null, date: null, confidence: null });
-      }
-
-      const amount = typeof parsed.amount === 'number' && parsed.amount > 0 ? parsed.amount : null;
+      const amount = extractAmountFromOcrText(fullText);
 
       return res.json({
         amount,
-        merchantName: parsed.merchantName ?? null,
-        date: parsed.date ?? null,
+        merchantName: null,
+        date: null,
         confidence: amount !== null ? 1.0 : null,
       });
     } catch (err) {
-      console.error('[OCR Gemini] erreur:', err?.status, err?.message);
-      if (err?.status === 429 || err?.code === 429)
-        return res.status(429).json({ error: 'Quota OCR dépassé. Réessaie plus tard.' });
-      if (err?.code === 'ECONNABORTED' || err?.code === 'ETIMEDOUT')
-        return res.status(503).json({ error: 'Le service OCR est temporairement indisponible.' });
-      // Toute erreur HTTP du SDK Gemini → 503 pour ne pas exposer le statut tiers au client
+      console.error('[OCR Mindee] erreur:', err?.status ?? err?.code, err?.message);
       if (err?.status) return res.status(503).json({ error: 'Le service OCR est temporairement indisponible.' });
       next(err);
     }
