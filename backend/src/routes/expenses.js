@@ -81,10 +81,13 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown, sans texte autour :
         confidence: amount !== null ? 1.0 : null,
       });
     } catch (err) {
+      console.error('[OCR Gemini] erreur:', err?.status, err?.message);
       if (err?.status === 429 || err?.code === 429)
         return res.status(429).json({ error: 'Quota OCR dépassé. Réessaie plus tard.' });
       if (err?.code === 'ECONNABORTED' || err?.code === 'ETIMEDOUT')
         return res.status(503).json({ error: 'Le service OCR est temporairement indisponible.' });
+      // Toute erreur HTTP du SDK Gemini → 503 pour ne pas exposer le statut tiers au client
+      if (err?.status) return res.status(503).json({ error: 'Le service OCR est temporairement indisponible.' });
       next(err);
     }
   }
