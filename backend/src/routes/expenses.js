@@ -22,7 +22,7 @@ const upload = multer({
   },
 });
 
-const GEMINI_MODEL = 'gemini-1.5-flash';
+const GEMINI_MODEL = 'gemini-2.0-flash';
 
 // POST /expenses/scan-receipt — OCR ticket de caisse via Mindee
 // requireAuth appliqué en amont (server.js) — pas d'assertMembership car aucune donnée de groupe n'est touchée
