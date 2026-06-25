@@ -1,5 +1,4 @@
 import { View, Text, TouchableOpacity, StyleSheet, FlatList } from 'react-native';
-import { useAuth } from '@clerk/clerk-expo';
 import { useApp } from '../context/AppContext';
 import Card from '../components/Card';
 import Button from '../components/Button';
@@ -8,7 +7,6 @@ import { theme } from '../theme/theme';
 const { colors, spacing, radius } = theme;
 
 export default function GroupSelectorScreen({ navigation }) {
-  const { signOut } = useAuth();
   const { myGroups, selectGroup } = useApp();
 
   const handleSelectGroup = async (group) => {
@@ -18,14 +16,6 @@ export default function GroupSelectorScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Mes colocs</Text>
-        <TouchableOpacity onPress={() => signOut()}>
-          <Text style={styles.signOutText}>Se déconnecter</Text>
-        </TouchableOpacity>
-      </View>
-      <Text style={styles.subtitle}>Sélectionnez la coloc à ouvrir.</Text>
-
       <FlatList
         data={myGroups}
         keyExtractor={(item) => item.id}
@@ -58,15 +48,7 @@ export default function GroupSelectorScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: spacing.lg, backgroundColor: colors.cream },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    marginTop: spacing.base,
-    marginBottom: spacing.sm,
-  },
-  title: { fontSize: 24, fontWeight: '700', color: colors.ink },
-  signOutText: { fontSize: 13, color: colors.inkLight },
+  title: { fontSize: 24, fontWeight: '700', color: colors.ink, marginTop: spacing.base, marginBottom: spacing.sm },
   subtitle: { fontSize: 14, color: colors.inkMuted, marginBottom: spacing.lg },
   card: { marginBottom: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cardMain: { flex: 1, marginRight: spacing.md },

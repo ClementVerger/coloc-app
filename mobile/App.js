@@ -32,7 +32,6 @@ import OnboardingScreen from './src/screens/OnboardingScreen';
 import GroupSelectorScreen from './src/screens/GroupSelectorScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import AddExpenseScreen from './src/screens/AddExpenseScreen';
-import HistoryScreen from './src/screens/HistoryScreen';
 import InviteScreen from './src/screens/InviteScreen';
 import DepositScreen from './src/screens/DepositScreen';
 import GroupSettingsScreen from './src/screens/GroupSettingsScreen';
@@ -78,7 +77,6 @@ function RootNavigation() {
 
         const groupsRes = await getMyGroups();
         const groups = groupsRes.data;
-        console.log('[DEBUG] groups from API:', JSON.stringify(groups[0]));
         setMyGroups(groups);
 
         // Tente de restaurer la dernière coloc sélectionnée
@@ -116,18 +114,17 @@ function RootNavigation() {
       <Stack.Navigator>
         {!isSignedIn ? (
           // Non connecté
-          <Stack.Screen name="Auth" component={AuthScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Auth" component={AuthScreen} options={{ title: 'Nouvelle coloc' }} />
         ) : currentGroup ? (
           // Coloc sélectionnée → Home en premier (GroupSelector/Onboarding accessibles via navigation)
           <>
             <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Ma coloc' }} />
             <Stack.Screen name="AddExpense" component={AddExpenseScreen} options={{ title: 'Nouvelle dépense' }} />
-            <Stack.Screen name="History" component={HistoryScreen} options={{ title: 'Historique' }} />
             <Stack.Screen name="Invite" component={InviteScreen} options={{ title: 'Inviter' }} />
             <Stack.Screen name="Deposit" component={DepositScreen} options={{ title: 'Dépôt de garantie' }} />
             <Stack.Screen name="GroupSettings" component={GroupSettingsScreen} options={{ title: 'Paramètres' }} />
             <Stack.Screen name="GroupSelector" component={GroupSelectorScreen} options={{ title: 'Mes colocs' }} />
-            <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ title: 'Nouvelle coloc' }} />
           </>
         ) : myGroups.length > 0 ? (
           // A des colocs mais aucune sélectionnée → GroupSelector en premier
@@ -135,20 +132,18 @@ function RootNavigation() {
             <Stack.Screen name="GroupSelector" component={GroupSelectorScreen} options={{ title: 'Mes colocs', headerBackVisible: false }} />
             <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Ma coloc' }} />
             <Stack.Screen name="AddExpense" component={AddExpenseScreen} options={{ title: 'Nouvelle dépense' }} />
-            <Stack.Screen name="History" component={HistoryScreen} options={{ title: 'Historique' }} />
             <Stack.Screen name="Invite" component={InviteScreen} options={{ title: 'Inviter' }} />
             <Stack.Screen name="Deposit" component={DepositScreen} options={{ title: 'Dépôt de garantie' }} />
             <Stack.Screen name="GroupSettings" component={GroupSettingsScreen} options={{ title: 'Paramètres' }} />
-            <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ title: 'Nouvelle coloc' }} />
           </>
         ) : (
           // Aucune coloc → Onboarding en premier
           <>
-            <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ title: 'Nouvelle coloc' }} />
             <Stack.Screen name="GroupSelector" component={GroupSelectorScreen} options={{ title: 'Mes colocs' }} />
             <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Ma coloc' }} />
             <Stack.Screen name="AddExpense" component={AddExpenseScreen} options={{ title: 'Nouvelle dépense' }} />
-            <Stack.Screen name="History" component={HistoryScreen} options={{ title: 'Historique' }} />
             <Stack.Screen name="Invite" component={InviteScreen} options={{ title: 'Inviter' }} />
             <Stack.Screen name="Deposit" component={DepositScreen} options={{ title: 'Dépôt de garantie' }} />
             <Stack.Screen name="GroupSettings" component={GroupSettingsScreen} options={{ title: 'Paramètres' }} />

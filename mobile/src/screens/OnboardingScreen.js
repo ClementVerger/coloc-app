@@ -4,13 +4,11 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
 } from 'react-native';
-import { useAuth } from '@clerk/clerk-expo';
 import { createGroup, joinGroupByCode, getMyGroups } from '../services/api';
 import { useApp } from '../context/AppContext';
 import Button from '../components/Button';
@@ -20,9 +18,9 @@ import { theme } from '../theme/theme';
 const { colors, spacing, radius } = theme;
 
 export default function OnboardingScreen({ navigation }) {
-  const { signOut } = useAuth();
   const { setMyGroups, selectGroup } = useApp();
   const [mode, setMode] = useState('create');
+
   const [loading, setLoading] = useState(false);
 
   const [groupName, setGroupName] = useState('');
@@ -82,10 +80,6 @@ export default function OnboardingScreen({ navigation }) {
       style={{ flex: 1 }}
     >
       <ScrollView contentContainerStyle={styles.container}>
-        <TouchableOpacity style={styles.signOutBtn} onPress={() => signOut()}>
-          <Text style={styles.signOutText}>Se déconnecter</Text>
-        </TouchableOpacity>
-
         <Text style={styles.title}>Bienvenue !</Text>
         <Text style={styles.subtitle}>Commencez par créer votre coloc ou rejoignez-en une.</Text>
 
@@ -205,11 +199,4 @@ const styles = StyleSheet.create({
   },
   hint: { fontSize: 12, color: colors.inkLight, marginTop: spacing.xs, marginBottom: spacing.sm },
   submitBtn: { marginTop: spacing.sm },
-  signOutBtn: {
-    alignSelf: 'flex-end',
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  signOutText: { color: colors.inkLight, fontSize: 13 },
 });
